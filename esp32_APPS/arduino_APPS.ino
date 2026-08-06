@@ -34,10 +34,10 @@ const int BRAKE_LIGHT = 3;
 
 // ---------------- Ready-to-drive state machine ----------------
 enum RtdState {
-  RTD_IDLE,            
+  RTD_IDLE,            /
   RTD_PRECHARGE_WAIT,  
   RTD_ACTIVE,          
-  RTD_READY            
+  RTD_READY           
 };
 RtdState rtdState = RTD_IDLE;
 
@@ -46,7 +46,10 @@ unsigned long implausibilityStart = 0;
 
 unsigned long rtdsStartTime = 0;
 bool precharge_done = false;
-bool prevButtonPressed = false; 
+bool prevButtonPressed = false; // for detecting a fresh (new) button press,
+                                 // separate from the initial press that
+                                 // enters RTD_PRECHARGE_WAIT
+
 int torque_percent = 0;
 
 unsigned long lastCANrxTime = 0;
@@ -139,12 +142,8 @@ void loop() {
   int diff = abs(apps1_percent - apps2_percent);
   bool diff_fault = (diff > 10);
 
-  bool brake_pressed = brake_percent > 30;
-  bool accel_pressed = avg_apps > 5;
-  bool brakeOverride = brake_pressed && accel_pressed;
-
-  bool apps_invalid = apps1_out || apps2_out; // NOTE: computed but not wired into a fault below - same as original code.
-  bool apps_fault = diff_fault;
+  bool apps_invalid = apps1_out || apps2_out;
+  bool apps_fault = diff_fault || apps_invalid;
 
   if (!implausibility) {
     if (apps_fault) {
@@ -182,9 +181,6 @@ void loop() {
       break;
 
     case RTD_PRECHARGE_WAIT:
-      // Button does not need to be held here. Once precharge is confirmed,
-      // RTDS does NOT auto-trigger just because brake is held - the driver
-      // must press the button again (a fresh press) together with brake.
       if (!sdc_ok || criticalFault) {
         rtdState = RTD_IDLE; // fault -> abort, start over
         break;
